@@ -55,7 +55,21 @@ export default defineConfig({
           autoTrack: false,
         } as PageManOptions,
       },
-      testMatch: /.*configuration\.spec\.ts/,
+      testMatch: [/.*configuration\.spec\.ts/, /.*error-handling\.spec\.ts/],
+    },
+
+    // Project for testing error handling with short timeout
+    {
+      name: 'chromium-short-timeout',
+      use: {
+        ...devices['Desktop Chrome'],
+        pageManOptions: {
+          closeTimeout: 100, // Very short timeout to test timeout errors
+          logCleanup: true,
+          autoTrack: false,
+        } as PageManOptions,
+      },
+      testMatch: /.*error-handling\.spec\.ts/,
     },
 
     // Project for testing manual-only mode (autoTrack disabled)

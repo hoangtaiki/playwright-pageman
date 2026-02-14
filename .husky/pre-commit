@@ -1,1 +1,2 @@
-npx lint-staged
+# Enforce lint, format:check, and prettier checks before commit
+npm run lint && npm run format:check && npx lint-staged
