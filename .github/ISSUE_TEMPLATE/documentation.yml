@@ -1,0 +1,71 @@
+name: Documentation Improvement
+description: Suggest improvements to documentation or report documentation issues
+title: '[Docs]: '
+labels: ['documentation', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation! 📚
+
+        Please provide as much detail as possible to help us improve the docs.
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation needs improvement?
+      options:
+        - README.md
+        - API Documentation
+        - Examples
+        - Migration Guide
+        - Contributing Guidelines
+        - Code Comments
+        - TypeScript Types
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: doc-location
+    attributes:
+      label: Documentation Location
+      description: Which file or section needs improvement?
+      placeholder: "README.md section 'Quick Start'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue-description
+    attributes:
+      label: Issue Description
+      description: What's unclear, missing, or incorrect in the current documentation?
+      placeholder: The example code doesn't work as expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: How would you improve this documentation?
+      placeholder: Add a code example that shows...
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context that might be helpful
+      placeholder: I was trying to... and expected...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help improve the documentation?
+      options:
+        - label: I'd like to submit a PR to fix this documentation issue
+          required: false

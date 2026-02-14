@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '04:00'
+    open-pull-requests-limit: 10
+    reviewers:
+      - 'hoangtaiki'
+    assignees:
+      - 'hoangtaiki'
+    commit-message:
+      prefix: 'chore'
+      prefix-development: 'chore'
+      include: 'scope'
+    ignore:
+      # Ignore major version updates for breaking changes
+      - dependency-name: '@playwright/test'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+
+  # Monitor GitHub Actions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '04:00'
+    open-pull-requests-limit: 3
+    reviewers:
+      - 'hoangtaiki'
+    assignees:
+      - 'hoangtaiki'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'
