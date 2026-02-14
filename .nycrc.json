@@ -1,0 +1,16 @@
+{
+  "all": true,
+  "reporter": ["html", "text", "lcov"],
+  "exclude": [
+    "tests/**",
+    "dist/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**"
+  ],
+  "check-coverage": true,
+  "lines": 80,
+  "functions": 80,
+  "branches": 70,
+  "statements": 80
+}

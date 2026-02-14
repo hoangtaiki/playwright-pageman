@@ -1,0 +1,88 @@
+{
+  "name": "playwright-pageman",
+  "version": "0.0.1",
+  "description": "Lightweight Playwright fixture that automatically tracks and closes extra pages and contexts created during tests — even when they fail, timeout, or retry",
+  "keywords": [
+    "playwright",
+    "testing",
+    "page-management",
+    "cleanup",
+    "fixture",
+    "typescript",
+    "test-automation",
+    "e2e-testing",
+    "browser-context",
+    "auto-close",
+    "playwright-fixture",
+    "test-framework"
+  ],
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "clean": "rm -rf dist test-results playwright-report",
+    "prepare": "husky && npm run build",
+    "prepublishOnly": "npm run clean && npm run build && npm run test",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "coverage": "nyc playwright test",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "release": "semantic-release",
+    "dev": "tsc --watch & playwright test --ui"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.41.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hoangtaiki/playwright-pageman.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hoangtaiki/playwright-pageman/issues"
+  },
+  "homepage": "https://github.com/hoangtaiki/playwright-pageman#readme",
+  "author": "Harry Tran <duchoang.vp@gmail.com>",
+  "publishConfig": {
+    "access": "public"
+  },
+  "lint-staged": {
+    "*.{ts,js,css,md}": "prettier --write",
+    "*.{ts,js}": "eslint --cache --fix"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.39.2",
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/git": "^10.0.0",
+    "@types/node": "^20.19.33",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "nyc": "^15.1.0",
+    "prettier": "^3.2.5",
+    "semantic-release": "^25.0.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0"
+  }
+}
