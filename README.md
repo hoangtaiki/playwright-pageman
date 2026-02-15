@@ -1,10 +1,15 @@
-# playwright-pageman
+<div align="center">
+<h1>playwright-pageman</h1>
 
-[![npm version](https://badge.fury.io/js/playwright-pageman.svg)](https://www.npmjs.com/package/playwright-pageman)
-[![CI](https://github.com/hoangtaiki/playwright-pageman/actions/workflows/ci.yml/badge.svg)](https://github.com/hoangtaiki/playwright-pageman/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/playwright-pageman.svg)](https://www.npmjs.com/package/playwright-pageman)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/hoangtaiki/playwright-pageman/actions/workflows/ci.yml/badge.svg)](https://github.com/hoangtaiki/playwright-pageman/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/hoangtaiki/playwright-pageman/branch/main/graph/badge.svg)](https://codecov.io/gh/hoangtaiki/playwright-pageman)
+[![Downloads](https://img.shields.io/npm/dt/playwright-pageman.svg)](https://www.npmjs.com/package/playwright-pageman)
 
 A lightweight Playwright fixture that **automatically tracks and closes extra pages (and optional contexts)** created during your tests — even when they fail, timeout, or retry.
+
+</div>
 
 ## The Problem
 
