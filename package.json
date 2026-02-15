@@ -1,6 +1,6 @@
 {
   "name": "playwright-pageman",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Lightweight Playwright fixture that automatically tracks and closes extra pages and contexts created during tests — even when they fail, timeout, or retry",
   "keywords": [
     "playwright",
