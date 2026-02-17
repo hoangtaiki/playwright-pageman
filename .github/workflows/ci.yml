@@ -159,4 +159,4 @@ jobs:
           cd test-install
           npm init -y
           npm install ../playwright-pageman-*.tgz
-          node -e "console.log(require('playwright-pageman'))"
+          node -e "import('playwright-pageman').then(m => console.log(m))"
