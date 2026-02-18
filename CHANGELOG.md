@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/hoangtaiki/playwright-pageman/compare/v1.0.0...v1.0.1) (2026-02-18)
+
+### Bug Fixes
+
+- increase timeout for Playwright browser installation and simplify release commit message format ([1976ef2](https://github.com/hoangtaiki/playwright-pageman/commit/1976ef2e186585c026cc11181f8eb47c63d38f43))
+
 # 1.0.0 (2026-02-15)
 
 ### Features
