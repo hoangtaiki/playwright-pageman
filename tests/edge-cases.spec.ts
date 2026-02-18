@@ -4,7 +4,7 @@ import {
   getExtraPages,
   getExtraContexts,
   extraPages,
-} from '../src/page-manager';
+} from '../src/index';
 
 test.describe('PageMan - Edge Cases', () => {
   test.describe('Already Closed Pages', () => {

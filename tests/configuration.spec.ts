@@ -1,4 +1,4 @@
-import { test, expect } from '../src/page-manager';
+import { test, expect } from '../src/index';
 
 test.describe('PageMan - Configuration', () => {
   test.describe('logCleanup Option', () => {

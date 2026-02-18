@@ -6,7 +6,8 @@
     "dist/**",
     "coverage/**",
     "playwright-report/**",
-    "test-results/**"
+    "test-results/**",
+    "**/*.config.{js,mjs,cjs,ts}"
   ],
   "check-coverage": true,
   "lines": 80,

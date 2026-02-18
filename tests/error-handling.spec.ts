@@ -5,7 +5,7 @@ import {
   getExtraContexts,
   extraPages,
   extraContexts,
-} from '../src/page-manager';
+} from '../src/index';
 
 test.describe('PageMan - Error Handling', () => {
   test.describe('Page Close Errors with Logging', () => {

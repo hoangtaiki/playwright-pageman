@@ -1,4 +1,4 @@
-import { test, expect } from '../src/page-manager';
+import { test, expect } from '../src/index';
 
 test.describe('ExtraPages - Core Functionality', () => {
   test.describe('Push and Track', () => {

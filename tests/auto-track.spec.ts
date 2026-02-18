@@ -1,4 +1,4 @@
-import { test, expect } from '../src/page-manager';
+import { test, expect } from '../src/index';
 
 test.describe('AutoTrack - Browser Proxy', () => {
   test('should auto-track pages created via browser.newPage()', async ({
