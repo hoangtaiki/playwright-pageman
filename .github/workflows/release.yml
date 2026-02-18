@@ -1,4 +1,4 @@
-name: Semantic Release
+name: Release
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   release:
-    name: Semantic Release
+    name: Release
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
@@ -30,6 +30,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci
@@ -65,10 +66,11 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: hoangtaiki/playwright-pageman
           flags: unittests
-          name: codecov-semantic-release
+          name: codecov-release
           fail_ci_if_error: false
 
-      - name: Semantic Release
-        run: npx semantic-release
+      - name: Release
+        run: npx release-it --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
