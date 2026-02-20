@@ -1,14 +1,14 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
-  issues: write
   pull-requests: write
   id-token: write
 
@@ -16,7 +16,12 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Only run after a successful push to main (not on PR checks)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
 
     steps:
       - name: Checkout code
@@ -24,53 +29,27 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Check out the exact commit that CI validated
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: TypeScript check
-        run: npm run typecheck
-
-      - name: Lint code
-        run: npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
       - name: Build project
         run: npm run build
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-        timeout-minutes: 15
-
-      - name: Run tests
-        run: npm test
-        env:
-          CI: true
-
-      - name: Generate coverage report
-        run: npm run coverage
-        continue-on-error: true
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: hoangtaiki/playwright-pageman
-          flags: unittests
-          name: codecov-release
-          fail_ci_if_error: false
-
       - name: Release
-        run: npx release-it --ci
+        uses: changesets/action@v1
+        with:
+          publish: npm run release
+          title: 'chore: release packages'
+          commit: 'chore: release packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
