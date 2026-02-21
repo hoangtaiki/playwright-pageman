@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/hoangtaiki/playwright-pageman/compare/v1.1.0...v1.1.1) (2026-02-21)
+
+### Bug Fixes
+
+- update Node.js action to v6 and add Playwright browser installation step ([c6732e6](https://github.com/hoangtaiki/playwright-pageman/commit/c6732e6c3d61f0f0e2f6d2d75330a5b8f646beb8))
+
 # [1.1.0](https://github.com/hoangtaiki/playwright-pageman/compare/v1.0.1...v1.1.0) (2026-02-21)
 
 ### Features
