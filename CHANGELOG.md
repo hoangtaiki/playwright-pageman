@@ -1,3 +1,9 @@
+# [1.1.0](https://github.com/hoangtaiki/playwright-pageman/compare/v1.0.1...v1.1.0) (2026-02-21)
+
+### Features
+
+- update CI workflows by adding release process ([#18](https://github.com/hoangtaiki/playwright-pageman/issues/18)) ([6647370](https://github.com/hoangtaiki/playwright-pageman/commit/6647370d2cd7b1834d4ac9ed8e390e2e540df683))
+
 ## [1.0.1](https://github.com/hoangtaiki/playwright-pageman/compare/v1.0.0...v1.0.1) (2026-02-18)
 
 ### Bug Fixes
