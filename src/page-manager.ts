@@ -209,12 +209,16 @@ let currentExtraContexts: ExtraContexts | null = null;
 let currentExtraBrowsers: ExtraBrowsers | null = null;
 
 function assertExtraPagesActive(): ExtraPages {
+  /* c8 ignore start -- guard unreachable from the test suite: the auto `_autoTrackSetup`
+     fixture depends on `extraPages`, so it is always active during a test. The guard
+     still protects real out-of-test access (helpers/page objects at import time). */
   if (!currentExtraPages) {
     throw new Error(
       'extraPages was accessed outside of a test that uses the extraPages fixture. ' +
         'Make sure your test imports { test } from "playwright-pageman" and uses the extraPages fixture.'
     );
   }
+  /* c8 ignore stop */
   return currentExtraPages;
 }
 

@@ -1,4 +1,4 @@
-import { test, expect } from '../src/index';
+import { test, expect, getExtraContexts, extraContexts } from '../src/index';
 
 test.describe('ExtraContexts - Core Functionality', () => {
   test.describe('Push and Track', () => {
@@ -129,6 +129,22 @@ test.describe('ExtraContexts - Core Functionality', () => {
 
     test('second test starts with empty tracker', async ({ extraContexts }) => {
       expect(extraContexts.length).toBe(0);
+    });
+  });
+
+  test.describe('Global Accessor Errors', () => {
+    // These tests intentionally do NOT use the extraContexts fixture, so the
+    // module-level accessor is null and the guard should throw.
+    test('getExtraContexts throws when accessed without the fixture', () => {
+      expect(() => getExtraContexts()).toThrow(
+        /extraContexts was accessed outside/
+      );
+    });
+
+    test('extraContexts proxy throws when accessed without the fixture', () => {
+      expect(() => extraContexts.length).toThrow(
+        /extraContexts was accessed outside/
+      );
     });
   });
 });

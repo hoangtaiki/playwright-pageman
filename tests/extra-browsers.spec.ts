@@ -225,4 +225,20 @@ test.describe('ExtraBrowsers - Core Functionality', () => {
       expect(extraBrowsers.length).toBe(0);
     });
   });
+
+  test.describe('Global Accessor Errors', () => {
+    // These tests intentionally do NOT use the extraBrowsers fixture, so the
+    // module-level accessor is null and the guard should throw.
+    test('getExtraBrowsers throws when accessed without the fixture', () => {
+      expect(() => getExtraBrowsers()).toThrow(
+        /extraBrowsers was accessed outside/
+      );
+    });
+
+    test('extraBrowsers proxy throws when accessed without the fixture', () => {
+      expect(() => extraBrowsers.length).toThrow(
+        /extraBrowsers was accessed outside/
+      );
+    });
+  });
 });
