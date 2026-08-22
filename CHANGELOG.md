@@ -1,3 +1,9 @@
+# [1.2.0](https://github.com/hoangtaiki/playwright-pageman/compare/v1.1.1...v1.2.0) (2026-08-22)
+
+### Features
+
+- add extraBrowsers fixture for tracking launched browsers ([#89](https://github.com/hoangtaiki/playwright-pageman/issues/89)) ([5e1725d](https://github.com/hoangtaiki/playwright-pageman/commit/5e1725d30e3d6251f6a597608851d2ef6f8e783a))
+
 ## [1.1.1](https://github.com/hoangtaiki/playwright-pageman/compare/v1.1.0...v1.1.1) (2026-02-21)
 
 ### Bug Fixes
