@@ -67,6 +67,7 @@ test('with context pages', async ({ browser, extraPages }) => {
 - **🔄 Auto-closes in reverse order** (safer for parent/child pages)
 - **📦 Optional manual tracking** — use `extraPages.push()` for `context.newPage()` or popups
 - **🎭 `extraContexts` fixture** for isolated browser contexts
+- **🌐 `extraBrowsers` fixture** for explicitly launched browsers (cross-engine tests)
 - **⚡ Works with parallel workers** — each test gets its own fixture instance
 - **⚙️ Configurable** via `test.use()` or project config
 
@@ -91,6 +92,20 @@ test('with context pages', async ({ browser, extraPages }) => {
 | `contexts`          | Readonly snapshot of tracked contexts              |
 | `remove(context)`   | Remove a context from tracking (returns `boolean`) |
 | `closeAll()`        | Close all tracked contexts immediately             |
+
+### `extraBrowsers` Fixture
+
+For tests that launch their own browser instances (e.g. `chromium.launch()` / `webkit.launch()` for cross-engine tests), track them here so the whole page → context → browser hierarchy is cleaned up. Closing a context does **not** close the browser process that owns it, so an explicitly launched `Browser` would otherwise leak until the worker exits.
+
+| Method / Property   | Description                                        |
+| ------------------- | -------------------------------------------------- |
+| `push(...browsers)` | Track one or more browsers for auto-cleanup        |
+| `length`            | Number of currently tracked browsers               |
+| `browsers`          | Readonly snapshot of tracked browsers              |
+| `remove(browser)`   | Remove a browser from tracking (returns `boolean`) |
+| `closeAll()`        | Close all tracked browsers immediately             |
+
+> **Note:** There is no auto-tracking for launched browsers (unlike `browser.newPage()`); push them explicitly with `extraBrowsers.push()`.
 
 ### Configuration
 
@@ -228,6 +243,31 @@ test('isolated sessions', async ({ browser, extraContexts }) => {
   const adminPage = await adminContext.newPage();
 
   // Both contexts (and their pages) auto-close after the test
+});
+```
+
+### Multiple browser engines
+
+`extraBrowsers` sits at the top of the page → context → browser hierarchy. Use it when a single test drives more than one engine and you want the launched browsers cleaned up automatically — even if an assertion throws.
+
+```typescript
+import { test, expect } from 'playwright-pageman';
+import { chromium, webkit } from '@playwright/test';
+
+test('cross-engine comparison', async ({ extraBrowsers }) => {
+  const chrome = await chromium.launch();
+  const safari = await webkit.launch();
+
+  extraBrowsers.push(chrome, safari); // tracked right after launch
+
+  const chromePage = await (await chrome.newContext()).newPage();
+  const safariPage = await (await safari.newContext()).newPage();
+
+  await chromePage.goto('https://example.com');
+  await safariPage.goto('https://example.com');
+
+  // Both browsers (and everything under them) auto-close after the test —
+  // no try/finally needed.
 });
 ```
 

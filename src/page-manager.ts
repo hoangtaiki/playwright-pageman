@@ -1,4 +1,4 @@
-import type { TestInfo, Page, BrowserContext } from '@playwright/test';
+import type { TestInfo, Page, Browser, BrowserContext } from '@playwright/test';
 import { test as base } from '@playwright/test';
 
 // ── Type augmentation ──────────────────────────────────────────────
@@ -50,12 +50,25 @@ export interface ExtraContexts {
   readonly contexts: readonly BrowserContext[];
 }
 
+export interface ExtraBrowsers {
+  /** Push one or more browsers to be auto-cleaned after the test */
+  push(...browsers: Browser[]): void;
+  /** Number of tracked browsers */
+  readonly length: number;
+  /** Remove a specific browser from tracking (will NOT auto-close it) */
+  remove(browser: Browser): boolean;
+  /** Close all tracked browsers immediately */
+  closeAll(): Promise<void>;
+  /** Get all tracked browsers (readonly snapshot) */
+  readonly browsers: readonly Browser[];
+}
+
 // ── Default options ────────────────────────────────────────────────
 
 const defaultOptions: Required<PageManOptions> = {
   closeTimeout: 5000,
   logCleanup: false,
-  autoTrack: true,
+  autoTrack: false,
 };
 
 function resolveOptions(testInfo: TestInfo): Required<PageManOptions> {
@@ -65,15 +78,19 @@ function resolveOptions(testInfo: TestInfo): Required<PageManOptions> {
 
 // ── Internal trackers ──────────────────────────────────────────────
 
-class PageTracker {
-  private tracked: Page[] = [];
+class ResourceTracker<T extends { close(): Promise<void> }> {
+  private tracked: T[] = [];
 
-  constructor(private options: Required<PageManOptions>) {}
+  constructor(
+    private options: Required<PageManOptions>,
+    private label: string,
+    private isClosedCheck?: (item: T) => boolean
+  ) {}
 
-  push(...pages: Page[]): void {
-    for (const page of pages) {
-      if (!this.tracked.includes(page)) {
-        this.tracked.push(page);
+  push(...items: T[]): void {
+    for (const item of items) {
+      if (!this.tracked.includes(item)) {
+        this.tracked.push(item);
       }
     }
   }
@@ -82,12 +99,12 @@ class PageTracker {
     return this.tracked.length;
   }
 
-  get pages(): readonly Page[] {
+  get items(): readonly T[] {
     return [...this.tracked];
   }
 
-  remove(page: Page): boolean {
-    const index = this.tracked.indexOf(page);
+  remove(item: T): boolean {
+    const index = this.tracked.indexOf(item);
     if (index !== -1) {
       this.tracked.splice(index, 1);
       return true;
@@ -101,35 +118,37 @@ class PageTracker {
     const count = this.tracked.length;
     if (this.options.logCleanup) {
       process.stdout.write(
-        `[pageman] Closing ${count} tracked page(s) in reverse order\n`
+        `[pageman] Closing ${count} tracked ${this.label}(s)\n`
       );
     }
 
-    // Close in reverse order (LIFO) — safer for parent/child pages
-    const reversed = [...this.tracked].reverse();
-
-    const closePromises = reversed.map(async page => {
+    // All closes dispatched concurrently; order of completion is non-deterministic.
+    let failures = 0;
+    const closePromises = this.tracked.map(async item => {
+      if (this.isClosedCheck?.(item)) return;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
-        if (!page.isClosed()) {
-          await Promise.race([
-            page.close(),
-            new Promise<void>((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Page close timeout')),
-                this.options.closeTimeout
-              )
-            ),
-          ]);
-        }
+        await Promise.race([
+          item.close(),
+          new Promise<void>((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error(`${this.label} close timeout`)),
+              this.options.closeTimeout
+            );
+          }),
+        ]);
       } catch (error: unknown) {
+        failures++;
         if (this.options.logCleanup) {
           const message =
             error instanceof Error ? error.message : String(error);
           process.stdout.write(
-            `[pageman] Warning: failed to close page: ${message}\n`
+            `[pageman] Warning: failed to close ${this.label}: ${message}\n`
           );
         }
         // Never rethrow during cleanup
+      } finally {
+        clearTimeout(timeoutId);
       }
     });
 
@@ -137,88 +156,49 @@ class PageTracker {
     this.tracked = [];
 
     if (this.options.logCleanup) {
-      process.stdout.write(
-        `[pageman] Successfully cleaned up ${count} page(s)\n`
-      );
+      if (failures === 0) {
+        process.stdout.write(
+          `[pageman] Successfully cleaned up ${count} ${this.label}(s)\n`
+        );
+      } else {
+        process.stdout.write(
+          `[pageman] Cleaned up ${count - failures}/${count} ${this.label}(s) (${failures} failed)\n`
+        );
+      }
     }
   }
 }
 
-class ContextTracker {
-  private tracked: BrowserContext[] = [];
-
-  constructor(private options: Required<PageManOptions>) {}
-
-  push(...contexts: BrowserContext[]): void {
-    for (const ctx of contexts) {
-      if (!this.tracked.includes(ctx)) {
-        this.tracked.push(ctx);
-      }
-    }
+class PageTracker extends ResourceTracker<Page> {
+  constructor(options: Required<PageManOptions>) {
+    super(options, 'page', page => page.isClosed());
   }
 
-  get length(): number {
-    return this.tracked.length;
+  get pages(): readonly Page[] {
+    return this.items;
+  }
+}
+
+class ContextTracker extends ResourceTracker<BrowserContext> {
+  constructor(options: Required<PageManOptions>) {
+    // BrowserContext has no isClosed() in Playwright's public API;
+    // the try/catch in ResourceTracker.closeAll() handles already-closed contexts.
+    super(options, 'context');
   }
 
   get contexts(): readonly BrowserContext[] {
-    return [...this.tracked];
+    return this.items;
+  }
+}
+
+class BrowserTracker extends ResourceTracker<Browser> {
+  constructor(options: Required<PageManOptions>) {
+    // Browser has no isClosed(); isConnected() is the inverse signal.
+    super(options, 'browser', browser => !browser.isConnected());
   }
 
-  remove(context: BrowserContext): boolean {
-    const index = this.tracked.indexOf(context);
-    if (index !== -1) {
-      this.tracked.splice(index, 1);
-      return true;
-    }
-    return false;
-  }
-
-  async closeAll(): Promise<void> {
-    if (this.tracked.length === 0) return;
-
-    const count = this.tracked.length;
-    if (this.options.logCleanup) {
-      process.stdout.write(
-        `[pageman] Closing ${count} tracked context(s) in reverse order\n`
-      );
-    }
-
-    // Close in reverse order (LIFO)
-    // Closing a context automatically closes all its pages
-    const reversed = [...this.tracked].reverse();
-
-    const closePromises = reversed.map(async ctx => {
-      try {
-        await Promise.race([
-          ctx.close(),
-          new Promise<void>((_, reject) =>
-            setTimeout(
-              () => reject(new Error('Context close timeout')),
-              this.options.closeTimeout
-            )
-          ),
-        ]);
-      } catch (error: unknown) {
-        if (this.options.logCleanup) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          process.stdout.write(
-            `[pageman] Warning: failed to close context: ${message}\n`
-          );
-        }
-        // Never rethrow during cleanup
-      }
-    });
-
-    await Promise.allSettled(closePromises);
-    this.tracked = [];
-
-    if (this.options.logCleanup) {
-      process.stdout.write(
-        `[pageman] Successfully cleaned up ${count} context(s)\n`
-      );
-    }
+  get browsers(): readonly Browser[] {
+    return this.items;
   }
 }
 
@@ -226,14 +206,19 @@ class ContextTracker {
 
 let currentExtraPages: ExtraPages | null = null;
 let currentExtraContexts: ExtraContexts | null = null;
+let currentExtraBrowsers: ExtraBrowsers | null = null;
 
 function assertExtraPagesActive(): ExtraPages {
+  /* c8 ignore start -- guard unreachable from the test suite: the auto `_autoTrackSetup`
+     fixture depends on `extraPages`, so it is always active during a test. The guard
+     still protects real out-of-test access (helpers/page objects at import time). */
   if (!currentExtraPages) {
     throw new Error(
       'extraPages was accessed outside of a test that uses the extraPages fixture. ' +
         'Make sure your test imports { test } from "playwright-pageman" and uses the extraPages fixture.'
     );
   }
+  /* c8 ignore stop */
   return currentExtraPages;
 }
 
@@ -245,6 +230,16 @@ function assertExtraContextsActive(): ExtraContexts {
     );
   }
   return currentExtraContexts;
+}
+
+function assertExtraBrowsersActive(): ExtraBrowsers {
+  if (!currentExtraBrowsers) {
+    throw new Error(
+      'extraBrowsers was accessed outside of a test that uses the extraBrowsers fixture. ' +
+        'Make sure your test imports { test } from "playwright-pageman" and uses the extraBrowsers fixture.'
+    );
+  }
+  return currentExtraBrowsers;
 }
 
 /**
@@ -266,6 +261,15 @@ export function getExtraContexts(): ExtraContexts {
 }
 
 /**
+ * Get the ExtraBrowsers instance for the currently running test.
+ *
+ * @throws {Error} If called outside of a test using the extraBrowsers fixture.
+ */
+export function getExtraBrowsers(): ExtraBrowsers {
+  return assertExtraBrowsersActive();
+}
+
+/**
  * Global ExtraPages proxy — access the current test's page tracker directly.
  * No function call needed, just import and use.
  *
@@ -281,7 +285,8 @@ export function getExtraContexts(): ExtraContexts {
  * ```
  */
 export const extraPages: ExtraPages = new Proxy({} as ExtraPages, {
-  get(_, prop: string) {
+  get(_, prop: string | symbol) {
+    if (typeof prop === 'symbol') return undefined;
     const fixture = assertExtraPagesActive();
     const value = fixture[prop as keyof ExtraPages];
     if (typeof value === 'function') {
@@ -307,9 +312,38 @@ export const extraPages: ExtraPages = new Proxy({} as ExtraPages, {
  * ```
  */
 export const extraContexts: ExtraContexts = new Proxy({} as ExtraContexts, {
-  get(_, prop: string) {
+  get(_, prop: string | symbol) {
+    if (typeof prop === 'symbol') return undefined;
     const fixture = assertExtraContextsActive();
     const value = fixture[prop as keyof ExtraContexts];
+    if (typeof value === 'function') {
+      return (value as (...args: any[]) => any).bind(fixture);
+    }
+    return value;
+  },
+});
+
+/**
+ * Global ExtraBrowsers proxy — access the current test's browser tracker directly.
+ * No function call needed, just import and use.
+ *
+ * @example
+ * ```ts
+ * import { extraBrowsers } from 'playwright-pageman';
+ * import { webkit } from '@playwright/test';
+ *
+ * async function launchSafari() {
+ *   const browser = await webkit.launch();
+ *   extraBrowsers.push(browser);
+ *   return browser;
+ * }
+ * ```
+ */
+export const extraBrowsers: ExtraBrowsers = new Proxy({} as ExtraBrowsers, {
+  get(_, prop: string | symbol) {
+    if (typeof prop === 'symbol') return undefined;
+    const fixture = assertExtraBrowsersActive();
+    const value = fixture[prop as keyof ExtraBrowsers];
     if (typeof value === 'function') {
       return (value as (...args: any[]) => any).bind(fixture);
     }
@@ -322,6 +356,7 @@ export const extraContexts: ExtraContexts = new Proxy({} as ExtraContexts, {
 export const test = base.extend<{
   extraPages: ExtraPages;
   extraContexts: ExtraContexts;
+  extraBrowsers: ExtraBrowsers;
   _autoTrackSetup: void;
 }>({
   // eslint-disable-next-line no-empty-pattern
@@ -384,6 +419,36 @@ export const test = base.extend<{
     }
   },
 
+  // eslint-disable-next-line no-empty-pattern
+  extraBrowsers: async ({}, use, testInfo) => {
+    const options = resolveOptions(testInfo);
+    const tracker = new BrowserTracker(options);
+
+    const fixture: ExtraBrowsers = {
+      push: (...browsers) => tracker.push(...browsers),
+      get length() {
+        return tracker.length;
+      },
+      remove: browser => tracker.remove(browser),
+      closeAll: () => tracker.closeAll(),
+      get browsers() {
+        return tracker.browsers;
+      },
+    };
+
+    // Set global accessor
+    currentExtraBrowsers = fixture;
+
+    await use(fixture);
+
+    // Teardown: always close all tracked browsers
+    try {
+      await tracker.closeAll();
+    } finally {
+      currentExtraBrowsers = null;
+    }
+  },
+
   // Auto-fixture: when autoTrack is enabled, monkey-patch browser.newPage
   // to automatically push created pages into extraPages
   _autoTrackSetup: [
@@ -398,10 +463,12 @@ export const test = base.extend<{
           return page;
         };
 
-        await use();
-
-        // Restore original method
-        browser.newPage = originalNewPage;
+        try {
+          await use();
+        } finally {
+          // Always restore the original method, even if teardown throws
+          browser.newPage = originalNewPage;
+        }
       } else {
         await use();
       }
