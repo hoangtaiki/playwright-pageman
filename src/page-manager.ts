@@ -17,7 +17,7 @@ export interface PageManOptions {
   closeTimeout?: number;
   /** Whether to log cleanup actions to stdout (default: false) */
   logCleanup?: boolean;
-  /** Auto-track pages created via browser.newPage() (default: false) */
+  /** Auto-track pages created via browser.newPage() (default: true) */
   autoTrack?: boolean;
   /**
    * Fail the test when a tracked resource could not be closed, instead of
@@ -71,7 +71,7 @@ export interface ExtraBrowsers {
 const defaultOptions: Required<PageManOptions> = {
   closeTimeout: 5000,
   logCleanup: false,
-  autoTrack: false,
+  autoTrack: true,
   strict: false,
 };
 
