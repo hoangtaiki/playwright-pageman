@@ -153,6 +153,8 @@ A tracked page that stays open outlives its test: it keeps using memory and show
 
 Use `strict: true` on CI to turn a leak into a failed test rather than a confusing report later in the run.
 
+**One thing to watch for:** a page is closed when the test that created it ends. If a helper creates a page with `browser.newPage()` inside a test and caches it for later tests to reuse, the next test gets a closed page. Create shared pages in your own worker-scoped fixture, or opt out as shown below.
+
 **To disable auto-tracking** (if you prefer manual tracking only):
 
 ```typescript
