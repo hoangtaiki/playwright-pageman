@@ -1,14 +1,11 @@
-import type { TestInfo, Page, Browser, BrowserContext } from '@playwright/test';
+import type { Page, Browser, BrowserContext } from '@playwright/test';
 import { test as base } from '@playwright/test';
 
 // ── Type augmentation ──────────────────────────────────────────────
 
 declare module '@playwright/test' {
+  // A test-scoped option: settable in the project config `use` and via test.use().
   interface PlaywrightTestOptions {
-    pageManOptions?: PageManOptions;
-  }
-
-  interface PlaywrightWorkerOptions {
     pageManOptions?: PageManOptions;
   }
 }
@@ -20,8 +17,14 @@ export interface PageManOptions {
   closeTimeout?: number;
   /** Whether to log cleanup actions to stdout (default: false) */
   logCleanup?: boolean;
-  /** Auto-track pages created via browser.newPage() (default: false) */
+  /** Auto-track pages created via browser.newPage() (default: true) */
   autoTrack?: boolean;
+  /**
+   * Fail the test when a tracked resource could not be closed, instead of
+   * only printing a warning. A resource that stays open outlives the test and
+   * shows up in later tests' screenshots and traces. (default: false)
+   */
+  strict?: boolean;
 }
 
 export interface ExtraPages {
@@ -68,12 +71,14 @@ export interface ExtraBrowsers {
 const defaultOptions: Required<PageManOptions> = {
   closeTimeout: 5000,
   logCleanup: false,
-  autoTrack: false,
+  autoTrack: true,
+  strict: false,
 };
 
-function resolveOptions(testInfo: TestInfo): Required<PageManOptions> {
-  const userOptions = (testInfo.project.use as any).pageManOptions || {};
-  return { ...defaultOptions, ...userOptions };
+function resolveOptions(
+  userOptions: PageManOptions | undefined
+): Required<PageManOptions> {
+  return { ...defaultOptions, ...(userOptions ?? {}) };
 }
 
 // ── Internal trackers ──────────────────────────────────────────────
@@ -84,7 +89,12 @@ class ResourceTracker<T extends { close(): Promise<void> }> {
   constructor(
     private options: Required<PageManOptions>,
     private label: string,
-    private isClosedCheck?: (item: T) => boolean
+    private isClosedCheck?: (item: T) => boolean,
+    /** A stronger close to try when item.close() fails or times out. */
+    private fallback?: {
+      description: string;
+      close: (item: T) => Promise<void>;
+    }
   ) {}
 
   push(...items: T[]): void {
@@ -117,38 +127,35 @@ class ResourceTracker<T extends { close(): Promise<void> }> {
 
     const count = this.tracked.length;
     if (this.options.logCleanup) {
-      process.stdout.write(
-        `[pageman] Closing ${count} tracked ${this.label}(s)\n`
-      );
+      this.log(`Closing ${count} tracked ${this.label}(s)`);
     }
 
     // All closes dispatched concurrently; order of completion is non-deterministic.
-    let failures = 0;
+    const leaked: string[] = [];
+    let recovered = 0;
     const closePromises = this.tracked.map(async item => {
       if (this.isClosedCheck?.(item)) return;
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      try {
-        await Promise.race([
-          item.close(),
-          new Promise<void>((_, reject) => {
-            timeoutId = setTimeout(
-              () => reject(new Error(`${this.label} close timeout`)),
-              this.options.closeTimeout
-            );
-          }),
-        ]);
-      } catch (error: unknown) {
-        failures++;
-        if (this.options.logCleanup) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          process.stdout.write(
-            `[pageman] Warning: failed to close ${this.label}: ${message}\n`
-          );
+      const reason = await this.attemptClose(() => item.close());
+      if (reason === undefined) return;
+      if (this.options.logCleanup) {
+        this.log(`Warning: failed to close ${this.label}: ${reason}`);
+      }
+      // A close that failed or timed out must not abandon the resource: it
+      // would stay open and leak into later tests. Try the stronger close.
+      if (this.fallback) {
+        const fallbackReason = await this.attemptClose(() =>
+          this.fallback!.close(item)
+        );
+        if (fallbackReason === undefined) {
+          recovered++;
+          if (this.options.logCleanup) {
+            this.log(`Recovered by ${this.fallback.description}`);
+          }
+          return;
         }
-        // Never rethrow during cleanup
-      } finally {
-        clearTimeout(timeoutId);
+        leaked.push(`${reason}; fallback failed: ${fallbackReason}`);
+      } else {
+        leaked.push(reason);
       }
     });
 
@@ -156,22 +163,63 @@ class ResourceTracker<T extends { close(): Promise<void> }> {
     this.tracked = [];
 
     if (this.options.logCleanup) {
-      if (failures === 0) {
-        process.stdout.write(
-          `[pageman] Successfully cleaned up ${count} ${this.label}(s)\n`
-        );
+      if (leaked.length === 0 && recovered === 0) {
+        this.log(`Successfully cleaned up ${count} ${this.label}(s)`);
       } else {
-        process.stdout.write(
-          `[pageman] Cleaned up ${count - failures}/${count} ${this.label}(s) (${failures} failed)\n`
+        this.log(
+          `Cleaned up ${count - leaked.length}/${count} ${this.label}(s) ` +
+            `(${leaked.length} failed, ${recovered} recovered by fallback)`
         );
       }
     }
+
+    if (leaked.length > 0) {
+      const summary =
+        `${leaked.length} ${this.label}(s) could not be closed and may leak ` +
+        `into later tests: ${leaked.join(' | ')}`;
+      if (this.options.strict) {
+        throw new Error(`[pageman] ${summary}`);
+      }
+      // Always visible, regardless of logCleanup: a leaked resource is a
+      // problem for every test that runs after this one.
+      this.log(`Warning: ${summary}`);
+    }
+  }
+
+  /** Runs a close against closeTimeout. Resolves to the failure reason, or undefined on success. */
+  private async attemptClose(
+    close: () => Promise<void>
+  ): Promise<string | undefined> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        close(),
+        new Promise<void>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`${this.label} close timeout`)),
+            this.options.closeTimeout
+          );
+        }),
+      ]);
+      return undefined;
+    } catch (error: unknown) {
+      return error instanceof Error ? error.message : String(error);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  private log(message: string): void {
+    process.stdout.write(`[pageman] ${message}\n`);
   }
 }
 
 class PageTracker extends ResourceTracker<Page> {
   constructor(options: Required<PageManOptions>) {
-    super(options, 'page', page => page.isClosed());
+    super(options, 'page', page => page.isClosed(), {
+      description: 'closing its context',
+      close: page => page.context().close(),
+    });
   }
 
   get pages(): readonly Page[] {
@@ -354,14 +402,20 @@ export const extraBrowsers: ExtraBrowsers = new Proxy({} as ExtraBrowsers, {
 // ── Fixtures ───────────────────────────────────────────────────────
 
 export const test = base.extend<{
+  pageManOptions: PageManOptions;
   extraPages: ExtraPages;
   extraContexts: ExtraContexts;
   extraBrowsers: ExtraBrowsers;
   _autoTrackSetup: void;
 }>({
-  // eslint-disable-next-line no-empty-pattern
-  extraPages: async ({}, use, testInfo) => {
-    const options = resolveOptions(testInfo);
+  // Option fixture: `option: true` lets the project config `use` override it and
+  // test.use() works as for any fixture. The module augmentation above makes
+  // TypeScript treat this as an override of an existing option, whose tuple form
+  // does not accept `option`, hence the cast.
+  pageManOptions: [defaultOptions, { option: true }] as any,
+
+  extraPages: async ({ pageManOptions }, use) => {
+    const options = resolveOptions(pageManOptions);
     const tracker = new PageTracker(options);
 
     const fixture: ExtraPages = {
@@ -389,9 +443,8 @@ export const test = base.extend<{
     }
   },
 
-  // eslint-disable-next-line no-empty-pattern
-  extraContexts: async ({}, use, testInfo) => {
-    const options = resolveOptions(testInfo);
+  extraContexts: async ({ pageManOptions }, use) => {
+    const options = resolveOptions(pageManOptions);
     const tracker = new ContextTracker(options);
 
     const fixture: ExtraContexts = {
@@ -419,9 +472,8 @@ export const test = base.extend<{
     }
   },
 
-  // eslint-disable-next-line no-empty-pattern
-  extraBrowsers: async ({}, use, testInfo) => {
-    const options = resolveOptions(testInfo);
+  extraBrowsers: async ({ pageManOptions }, use) => {
+    const options = resolveOptions(pageManOptions);
     const tracker = new BrowserTracker(options);
 
     const fixture: ExtraBrowsers = {
@@ -452,8 +504,8 @@ export const test = base.extend<{
   // Auto-fixture: when autoTrack is enabled, monkey-patch browser.newPage
   // to automatically push created pages into extraPages
   _autoTrackSetup: [
-    async ({ browser, extraPages: fixture }, use, testInfo) => {
-      const options = resolveOptions(testInfo);
+    async ({ browser, extraPages: fixture, pageManOptions }, use) => {
+      const options = resolveOptions(pageManOptions);
 
       if (options.autoTrack) {
         const originalNewPage = browser.newPage.bind(browser);

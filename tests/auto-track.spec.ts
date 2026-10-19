@@ -136,3 +136,43 @@ test.describe('AutoTrack - Browser Proxy', () => {
     expect(extraPages.pages).toContain(newPage);
   });
 });
+
+test.describe('PageMan - autoTrack default', () => {
+  // An empty options object makes every option fall back to its default.
+  test.use({ pageManOptions: {} });
+
+  test('auto-tracks browser.newPage() when no options are given', async ({
+    browser,
+    extraPages,
+  }) => {
+    const page = await browser.newPage();
+
+    expect(extraPages.length).toBe(1);
+    expect(extraPages.pages).toContain(page);
+  });
+
+  test('closes an auto-tracked page when the test ends', async ({
+    browser,
+    extraPages,
+  }) => {
+    const page = await browser.newPage();
+    await extraPages.closeAll();
+
+    expect(page.isClosed()).toBe(true);
+  });
+});
+
+test.describe('PageMan - autoTrack opt-out', () => {
+  test.use({ pageManOptions: { autoTrack: false } });
+
+  test('does not track browser.newPage() when autoTrack is false', async ({
+    browser,
+    extraPages,
+  }) => {
+    const page = await browser.newPage();
+
+    expect(extraPages.length).toBe(0);
+
+    await page.close();
+  });
+});

@@ -64,6 +64,7 @@ test('with context pages', async ({ browser, extraPages }) => {
 - **🎯 Auto-tracking enabled by default** — pages from `browser.newPage()` are automatically tracked and closed
 - **🚀 Zero boilerplate** — no manual `push()`, no `try...finally` everywhere
 - **🛡️ Handles failures, timeouts, and retries** gracefully — cleanup always runs
+- **🧹 No silent leaks** — if `page.close()` fails or times out, the page's context is closed instead; anything still open is reported, or fails the test in `strict` mode
 - **🔄 Auto-closes in reverse order** (safer for parent/child pages)
 - **📦 Optional manual tracking** — use `extraPages.push()` for `context.newPage()` or popups
 - **🎭 `extraContexts` fixture** for isolated browser contexts
@@ -120,6 +121,7 @@ test.use({
     closeTimeout: 5000, // Max ms to wait per page/context close (default: 5000)
     logCleanup: false, // Log cleanup actions to stdout (default: false)
     autoTrack: true, // Auto-track browser.newPage() calls (default: true)
+    strict: false, // Fail the test if a tracked resource could not be closed (default: false)
   } as PageManOptions,
 });
 ```
@@ -140,6 +142,18 @@ export default defineConfig({
   },
 });
 ```
+
+### Close failures and leaks
+
+A tracked page that stays open outlives its test: it keeps using memory and shows up in later tests' failure screenshots and traces. PageMan therefore never abandons a resource:
+
+1. `page.close()` is awaited up to `closeTimeout`.
+2. If that fails or times out, the page's **context** is closed instead, which tears the page down even when `page.close()` hangs.
+3. If the resource is still open, a warning is printed **regardless of `logCleanup`**. With `strict: true` the cleanup throws instead, so the test fails visibly and Playwright starts the next test in a fresh worker.
+
+Use `strict: true` on CI to turn a leak into a failed test rather than a confusing report later in the run.
+
+**One thing to watch for:** a page is closed when the test that created it ends. If a helper creates a page with `browser.newPage()` inside a test and caches it for later tests to reuse, the next test gets a closed page. Create shared pages in your own worker-scoped fixture, or opt out as shown below.
 
 **To disable auto-tracking** (if you prefer manual tracking only):
 
