@@ -1,3 +1,9 @@
+# [1.3.0](https://github.com/hoangtaiki/playwright-pageman/compare/v1.2.0...v1.3.0) (2026-10-19)
+
+### Features
+
+- recover from failed page closes and add strict mode ([#101](https://github.com/hoangtaiki/playwright-pageman/issues/101)) ([d4fce32](https://github.com/hoangtaiki/playwright-pageman/commit/d4fce324e7d273487aa6925340b5ff9edd75e64d)), closes [#102](https://github.com/hoangtaiki/playwright-pageman/issues/102)
+
 # [1.2.0](https://github.com/hoangtaiki/playwright-pageman/compare/v1.1.1...v1.2.0) (2026-08-22)
 
 ### Features
